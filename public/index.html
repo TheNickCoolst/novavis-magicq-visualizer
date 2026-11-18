@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NovaVis Visualizer</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    /* Visualizer-only mode: all control UI permanently hidden, only the 3D stage remains */
+    #topbar, #dockLeft, #dockRight, #bottomDock, #btnRestoreHud, #magicqModal, #liveToast { display: none !important; }
+    html, body { margin: 0; overflow: hidden; background: #000; }
+    #viewport { position: fixed; inset: 0; }
+  </style>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "/vendor/three/build/three.module.js"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="viewport"></div>
+
+  <!-- Drag & Drop Overlay for .mvr / .csv live MagicQ import -->
+  <div id="dropOverlay" class="drop-overlay hidden">
+    <div class="drop-box">
+      <h2>📥 MagicQ Show / Patch Live-Import</h2>
+      <p>Lasse deine <code>.mvr</code>, <code>.xml</code> oder <code>.csv</code> Datei los – das 3D-Rig passt sich sofort live an!</p>
+    </div>
+  </div>
+
+  <!-- Live Adaptation Toast Notification -->
+  <div id="liveToast" class="live-toast hidden"></div>
+
+  <!-- Top L8 Studio HUD -->
+  <header class="topbar" id="topbar">
+    <div class="brand">
+      <div class="brand-mark"></div>
+      <div>
+        <div class="brand-title">NOVAVIS <span>L8 PRO</span></div>
+        <div class="brand-sub">Live Auto-Sync 3D Engine · ChamSys MagicQ (64 Universen)</div>
+      </div>
+    </div>
+
+    <div class="net-cluster">
+      <div class="net-pill" id="netStatusPill">
+        <span class="status-dot" id="netDot"></span>
+        <span id="netStatusText">Verbinde Bridge…</span>
+      </div>
+      <button class="btn btn-subtle" id="btnTestArtNet" title="Sendet echte UDP Art-Net 4 Pakete an 127.0.0.1:6454">
+        ⚡ Live Art-Net Test
+      </button>
+      <button class="btn btn-primary" id="btnOpenMagicQModal">
+        🌐 LAN &amp; MagicQ Sync
+      </button>
+    </div>
+
+    <div class="cam-cluster">
+      <button class="cam-btn active" data-cam="foh">1 · FOH</button>
+      <button class="cam-btn" data-cam="low">2 · Lip</button>
+      <button class="cam-btn" data-cam="aerial">3 · Aerial</button>
+      <button class="cam-btn" data-cam="wingL">4 · Wing</button>
+      <button class="cam-btn" data-cam="booth">5 · Booth</button>
+      <button class="cam-btn" data-cam="orbit">6 · Orbit</button>
+      <button class="btn btn-icon" id="btnToggleHud" title="UI ein-/ausblenden (Tab)">⛶</button>
+    </div>
+  </header>
+
+  <button class="hud-restore hidden" id="btnRestoreHud">⛶ Studio-UI einblenden (Tab)</button>
+
+  <!-- Left Dock: Stage Rig, MagicQ Auto-Adapt, L8 Physics & Atmosphere -->
+  <aside class="dock dock-left" id="dockLeft">
+    <div class="panel-section">
+      <div class="section-title">
+        <span>MAGICQ LIVE-SYNC &amp; RIG</span>
+        <span class="fps-badge" id="fpsBadge">60 FPS</span>
+      </div>
+
+      <label class="field-label" for="rigSelect">Aktives 3D Stage-Setup</label>
+      <select id="rigSelect" class="select-input">
+        <option value="arena">Festival Arena Rig (28 Heads · U1–U2)</option>
+        <option value="club">Cyber Club Tunnel (28 Heads · U1–U2)</option>
+        <option value="theater">Concert Symphonic Arch (28 Heads · U1–U2)</option>
+      </select>
+
+      <label class="field-label" for="inputModeSelect">DMX Signalquelle</label>
+      <select id="inputModeSelect" class="select-input">
+        <option value="auto">Auto (MagicQ Live-Priorität)</option>
+        <option value="artnet">Nur MagicQ Live (Art-Net / sACN)</option>
+        <option value="internal">Interne L8 Show-Konsole</option>
+      </select>
+
+      <label class="check-row highlight-check" title="Erkennt automatisch neue aktive Universen, Kanäle & MVR/CSV-Exporte aus MagicQ und passt das 3D-Rig live an">
+        <input type="checkbox" id="chkAutoAdapt" checked />
+        <span>🔄 Live Auto-Adapt an MagicQ</span>
+      </label>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title"><span>L8 OPTIK, LED-WALL &amp; PHYSIK</span></div>
+
+      <label class="field-label" for="selLedWall">Upstage SMD LED-Video-Wall</label>
+      <select id="selLedWall" class="select-input">
+        <option value="1">L8 Cyber Horizon Matrix</option>
+        <option value="2">Live Audio / BPM Analyzer</option>
+        <option value="3">Architectural Color Cyc</option>
+        <option value="0">Aus (Schwarzer Molton)</option>
+      </select>
+
+      <div class="slider-row"><span>3D Haze / Nebel-Dichte</span><strong id="valHaze">88%</strong></div>
+      <input type="range" id="slHaze" min="0" max="145" value="88" />
+
+      <div class="slider-row"><span>Haze-Turbulenz</span><strong id="valHazeSpeed">90%</strong></div>
+      <input type="range" id="slHazeSpeed" min="0" max="200" value="90" />
+
+      <div class="slider-row"><span>HDR Lens Bloom</span><strong id="valBloom">96%</strong></div>
+      <input type="range" id="slBloom" min="0" max="180" value="96" />
+
+      <div class="slider-row"><span>Bühnen-Arbeitslicht</span><strong id="valWorklight">14%</strong></div>
+      <input type="range" id="slWorklight" min="0" max="100" value="14" />
+
+      <div class="toggle-grid">
+        <label class="check-row">
+          <input type="checkbox" id="chkMotorPhysics" checked />
+          <span>Motor-Trägheit &amp; Halogen-Nachglühen</span>
+        </label>
+        <label class="check-row">
+          <input type="checkbox" id="chkReflection" checked />
+          <span>Echtzeit-Bodenreflexion</span>
+        </label>
+        <label class="check-row">
+          <input type="checkbox" id="chkLabels" />
+          <span>3D DMX-Adressen im Rig zeigen</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">
+        <span>GRUPPEN-WAHL</span>
+        <span class="muted-tag" id="selCountTag">0 gewählt</span>
+      </div>
+      <div class="group-grid">
+        <button class="chip-btn" data-group="all">Alle</button>
+        <button class="chip-btn" data-group="upstage-beams">US Beams</button>
+        <button class="chip-btn" data-group="mid-washes">MS Washes</button>
+        <button class="chip-btn" data-group="floor-beams">Deck Beams</button>
+        <button class="chip-btn" data-group="pixel-bars">Pixel Bars</button>
+        <button class="chip-btn" data-group="blinders">Blinders</button>
+        <button class="chip-btn" data-group="odd">Odd</button>
+        <button class="chip-btn" data-group="even">Even</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Right Dock: Live Fixture Inspector, XY Pad & Optics -->
+  <aside class="dock dock-right" id="dockRight">
+    <div class="panel-section">
+      <div class="section-title">
+        <span>PROGRAMMER · PAN / TILT</span>
+        <button class="btn-xs" id="btnClearProg">Clear</button>
+      </div>
+
+      <div class="xy-pad-wrap">
+        <canvas id="xyPad" width="228" height="142"></canvas>
+        <div class="xy-readout" id="xyReadout">Pan 0° · Tilt +18°</div>
+      </div>
+
+      <div class="slider-row"><span>Symmetrischer Pan-Fan</span><strong id="valPanFan">0%</strong></div>
+      <input type="range" id="slPanFan" min="-100" max="100" value="0" />
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title"><span>BEAM, GOBO &amp; PRISMA</span></div>
+
+      <div class="swatch-row" id="swatchRow">
+        <button class="swatch" data-rgb="255,255,255" style="background:#ffffff"></button>
+        <button class="swatch" data-rgb="0,216,255" style="background:#00d8ff"></button>
+        <button class="swatch" data-rgb="30,90,255" style="background:#1e5aff"></button>
+        <button class="swatch" data-rgb="180,30,255" style="background:#b41eff"></button>
+        <button class="swatch" data-rgb="255,20,185" style="background:#ff14b9"></button>
+        <button class="swatch" data-rgb="255,22,42" style="background:#ff162a"></button>
+        <button class="swatch" data-rgb="255,140,15" style="background:#ff8c0f"></button>
+        <button class="swatch" data-rgb="30,255,115" style="background:#1eff73"></button>
+        <input type="color" id="colorPicker" value="#00d8ff" />
+      </div>
+
+      <div class="dual-grid">
+        <div>
+          <div class="slider-row"><span>Dimmer</span><strong id="valProgDim">100%</strong></div>
+          <input type="range" id="slProgDim" min="0" max="255" value="255" />
+        </div>
+        <div>
+          <div class="slider-row"><span>Strobe</span><strong id="valProgStrobe">Open</strong></div>
+          <input type="range" id="slProgStrobe" min="0" max="245" value="0" />
+        </div>
+      </div>
+
+      <div class="slider-row"><span>Zoom</span><strong id="valProgZoom">3.9°</strong></div>
+      <input type="range" id="slProgZoom" min="0" max="255" value="28" />
+
+      <div class="dual-grid" style="margin-top:5px">
+        <div>
+          <label class="field-label" for="selGobo">Gobo</label>
+          <select id="selGobo" class="select-input">
+            <option value="0">Open</option>
+            <option value="48">Tunnel Ring</option>
+            <option value="80">Starburst 8x</option>
+            <option value="112">Triangle</option>
+            <option value="144">Breakup Dots</option>
+            <option value="176">Crosshair</option>
+            <option value="220">Spin 8x</option>
+          </select>
+        </div>
+        <div>
+          <label class="field-label" for="selPrism">8x Prisma</label>
+          <select id="selPrism" class="select-input">
+            <option value="0">Aus</option>
+            <option value="64">Statisch</option>
+            <option value="165">Rot. CW</option>
+            <option value="220">Rot. CCW</option>
+          </select>
+        </div>
+      </div>
+
+      <label class="field-label" for="selFx">Movement FX</label>
+      <select id="selFx" class="select-input">
+        <option value="none">Kein FX</option>
+        <option value="circle">Circle Symmetrisch</option>
+        <option value="tiltwave">Tilt Sine Wave</option>
+        <option value="fig8">Figure-8 Sweep</option>
+      </select>
+    </div>
+
+    <!-- Live Selected Fixture Patch & 3D Position Editor -->
+    <div class="panel-section" id="liveHeadInspector">
+      <div class="section-title">
+        <span>LIVE HEAD PATCH &amp; 3D POS</span>
+        <button class="btn-xs" id="btnAddFixture" title="Neues Moving-Light live zur Bühne hinzufügen">+ Head</button>
+      </div>
+      <div id="inspectorEmpty" class="inspector-hint">Klicke ein Fixture in 3D an, um DMX-Adresse oder X/Y/Z Position live anzupassen.</div>
+      <div id="inspectorForm" class="hidden">
+        <div class="dual-grid">
+          <div>
+            <label class="field-label" for="inpFixUni">MagicQ Uni (1–64)</label>
+            <input type="number" id="inpFixUni" class="num-input" min="1" max="64" value="1" />
+          </div>
+          <div>
+            <label class="field-label" for="inpFixAddr">DMX Start (1–512)</label>
+            <input type="number" id="inpFixAddr" class="num-input" min="1" max="512" value="1" />
+          </div>
+        </div>
+        <div class="tri-grid">
+          <div>
+            <label class="field-label" for="inpPosX">X (m)</label>
+            <input type="number" id="inpPosX" class="num-input" step="0.2" value="0" />
+          </div>
+          <div>
+            <label class="field-label" for="inpPosY">Y (m)</label>
+            <input type="number" id="inpPosY" class="num-input" step="0.2" value="6.2" />
+          </div>
+          <div>
+            <label class="field-label" for="inpPosZ">Z (m)</label>
+            <input type="number" id="inpPosZ" class="num-input" step="0.2" value="-4.1" />
+          </div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Bottom Executor & DMX Universe Monitor Dock -->
+  <footer class="bottom-dock" id="bottomDock">
+    <div class="transport-row">
+      <div class="transport-left">
+        <button class="btn btn-play active" id="btnPlayPause">⏸ Show Läuft</button>
+        <button class="btn btn-subtle" id="btnAutoCue">🔁 Auto-Chaser</button>
+        <div class="bpm-box">
+          <span>BPM</span>
+          <input type="range" id="slBpm" min="70" max="175" value="126" />
+          <strong id="valBpm">126</strong>
+          <button class="btn-xs" id="btnTapBpm">TAP</button>
+        </div>
+        <button class="btn btn-subtle" id="btnMicAudio">🎙️ Sound-to-Light</button>
+      </div>
+
+      <div class="transport-right">
+        <button class="btn btn-subtle" id="btnDmxScope">📊 512-Ch Monitor</button>
+        <button class="btn btn-subtle" id="btnHighlight">💡 Highlight (H)</button>
+        <button class="btn btn-danger" id="btnBlackout">⬛ Blackout (B)</button>
+        <div class="gm-box">
+          <span>GM</span>
+          <input type="range" id="slGrandMaster" min="0" max="100" value="100" />
+          <strong id="valGm">100%</strong>
+        </div>
+      </div>
+    </div>
+
+    <div class="cue-strip" id="cueStrip"></div>
+
+    <div class="dmx-drawer hidden" id="dmxDrawer">
+      <div class="dmx-drawer-head">
+        <span>LIVE 512-KANAL DMX UNIVERSUM ANALYZER</span>
+        <div class="uni-tabs">
+          <button class="btn-xs active" data-uni="0">Uni 1 (Art-Net 0-0)</button>
+          <button class="btn-xs" data-uni="1">Uni 2 (Art-Net 0-1)</button>
+          <button class="btn-xs" data-uni="2">Uni 3 (Art-Net 0-2)</button>
+          <button class="btn-xs" data-uni="3">Uni 4 (Art-Net 0-3)</button>
+        </div>
+      </div>
+      <canvas id="dmxCanvas" width="1180" height="70"></canvas>
+    </div>
+  </footer>
+
+  <!-- MagicQ Live-Sync & MVR/CSV Modal -->
+  <div class="modal-backdrop hidden" id="magicqModal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div>
+          <h2>🌐 LAN-Freigabe &amp; ChamSys MagicQ Live-Sync</h2>
+          <p>Im gesamten lokalen Netzwerk erreichbar via HTTP, WebSocket, Bonjour/mDNS, Art-Net 4 (:6454), sACN (:5568) &amp; OSC (:8000).</p>
+        </div>
+        <button class="btn-icon" id="btnCloseModal">✕</button>
+      </div>
+
+      <div id="lanUrlList" class="step-box" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        <strong>Aktive LAN-Adressen:</strong> <span id="lanUrlBadges" style="display:flex;gap:6px;flex-wrap:wrap;"></span>
+      </div>
+
+      <div class="steps-grid">
+        <div class="step-box">
+          <div class="step-num">1</div>
+          <h3>Auto-Discovery in MagicQ</h3>
+          <p>In MagicQ <code>Setup → View DMX I/O</code> öffnen. NovaVis meldet sich per <code>ArtPollReply</code> automatisch als <strong>NovaVis L8 Pro</strong> auf <code id="modalLocalIp">127.0.0.1</code> (bis zu 64 Universen kostenlos).</p>
+        </div>
+        <div class="step-box">
+          <div class="step-num">2</div>
+          <h3>Live Rig-Anpassung (.mvr / .csv)</h3>
+          <p>Exportiere dein Patch in MagicQ als <code>.mvr</code> oder <code>.csv</code> nach <code>~/Documents/MagicQ/show</code> oder ziehe die Datei einfach per Drag-&amp;-Drop ins 3D-Fenster!</p>
+        </div>
+        <div class="step-box">
+          <div class="step-num">3</div>
+          <h3>Zero-Export Auto-Sense</h3>
+          <p>Selbst ohne Export erkennt <strong>Live Auto-Adapt</strong> aktive DMX-Universen aus MagicQ sofort und passt die Bühnen-Adressierung automatisch an.</p>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <input type="file" id="filePatchInput" accept=".mvr,.csv,.xml" class="hidden" />
+        <button class="btn btn-primary" id="btnImportFile">📂 MagicQ .MVR / .CSV jetzt importieren</button>
+        <button class="btn btn-subtle" id="btnDownloadCsv">⬇️ Aktuelles Rig als MagicQ .CSV speichern</button>
+        <button class="btn btn-subtle" id="btnModalTestUdp">⚡ Art-Net Loopback-Show testen</button>
+      </div>
+
+      <div class="patch-table-wrap">
+        <table class="patch-table">
+          <thead>
+            <tr>
+              <th>Head #</th>
+              <th>Name</th>
+              <th>Typ / Modus</th>
+              <th>MagicQ DMX</th>
+              <th>Art-Net Port</th>
+              <th>3D Position (X, Y, Z)</th>
+            </tr>
+          </thead>
+          <tbody id="patchTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>
