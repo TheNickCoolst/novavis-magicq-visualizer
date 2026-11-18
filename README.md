@@ -4,13 +4,29 @@ Moderner, 100 % offline-fähiger 3D-Lichtvisualizer auf L8-Niveau mit **Live-Anp
 
 ## Schnellstart
 
+Voraussetzung: [Node.js](https://nodejs.org) 18 oder neuer.
+
+**Windows:** Doppelklick auf `start-windows.bat` (installiert beim ersten Start die Abhängigkeiten und öffnet den Browser).
+
+**macOS:** Doppelklick auf `start-mac.command`.
+
+**Manuell (alle Systeme):**
+
 ```bash
+npm install
 npm start
 ```
 
 Öffne anschließend im Browser:
-- **Lokal auf diesem Mac:** `http://localhost:4321`
+- **Lokal auf diesem Rechner:** `http://localhost:4321`
 - **Tests ausführen (ArtPoll, ArtDmx, sACN & MVR-Import):** `npm run test:artnet`
+
+### Hinweise für Windows
+
+- Beim ersten Start fragt die **Windows-Firewall** nach Netzwerkzugriff für Node.js → für **private Netzwerke zulassen**, sonst kommen Art-Net/sACN-Pakete nicht an.
+- MagicQ-Showordner werden automatisch gesucht: `Dokumente\MagicQ\show` (auch OneDrive), `C:\Users\Public\Documents\MagicQ\show`, `C:\Program Files\ChamSys Ltd\MagicQ PC\show`. Anderer Ordner: `set MAGICQ_SHOW_DIR=D:\Shows\show` vor dem Start.
+- Laufen MagicQ und Visualizer auf **demselben Windows-PC** und kommen keine Daten an, in MagicQ für Art-Net **Broadcast** bzw. sACN (Multicast) als Ausgabe wählen.
+- Bonjour/mDNS (`http://<rechner>.local:4321`) funktioniert nur, wenn Apple Bonjour installiert ist; per IP-Adresse geht es immer.
 
 ---
 
@@ -18,7 +34,7 @@ npm start
 
 1. **Automatische Node-Erkennung (`ArtPollReply`)**
    - Öffne in MagicQ `Setup → View DMX I/O`.
-   - NovaVis L8 Pro läuft mit `SO_REUSEADDR` parallel zu MagicQ auf demselben Mac (`127.0.0.1`) oder über dein LAN und meldet sich automatisch als Visualizer-Node **`NovaVis L8 Pro`** (`Style = 0x03 StVisual`).
+   - NovaVis L8 Pro läuft mit `SO_REUSEADDR` parallel zu MagicQ auf demselben Rechner (`127.0.0.1`) oder über dein LAN und meldet sich automatisch als Visualizer-Node **`NovaVis L8 Pro`** (`Style = 0x03 StVisual`).
    - Aktiviere in MagicQ einfach **Universe 1 → Art-Net 0-0** und **Universe 2 → Art-Net 0-1** (bis zu **64 Universen** kostenlos ohne Hardware/Dongle).
 
 2. **Drei Wege der Live-Anpassung**

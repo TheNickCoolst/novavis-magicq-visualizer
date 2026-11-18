@@ -357,11 +357,25 @@ export async function setupMagicQLiveFolderWatchers(workspaceDir, onRigImported)
   const syncDir = path.join(workspaceDir, 'magicq-sync');
   await fsp.mkdir(syncDir, { recursive: true });
 
+  const home = os.homedir();
   const candidateDirs = [
     syncDir,
-    path.join(os.homedir(), 'Documents', 'MagicQ', 'show'),
-    path.join(os.homedir(), 'MagicQ', 'show'),
+    path.join(home, 'Documents', 'MagicQ', 'show'),
+    path.join(home, 'MagicQ', 'show'),
   ];
+  if (process.platform === 'win32') {
+    const env = process.env;
+    // OneDrive often redirects "Documents" on Windows
+    if (env.OneDrive) candidateDirs.push(path.join(env.OneDrive, 'Documents', 'MagicQ', 'show'));
+    if (env.PUBLIC) candidateDirs.push(path.join(env.PUBLIC, 'Documents', 'MagicQ', 'show'));
+    for (const pf of [env.ProgramFiles, env['ProgramFiles(x86)']].filter(Boolean)) {
+      candidateDirs.push(path.join(pf, 'ChamSys Ltd', 'MagicQ PC', 'show'));
+    }
+  }
+  // Manual override: MAGICQ_SHOW_DIR=<folder> (multiple separated by path delimiter)
+  if (process.env.MAGICQ_SHOW_DIR) {
+    candidateDirs.push(...process.env.MAGICQ_SHOW_DIR.split(path.delimiter).filter(Boolean));
+  }
 
   const watchedSet = new Set();
   const watchedPaths = [];

@@ -33,6 +33,10 @@ const dirtyUniverses = new Set();
 let latestSyncedRig = null;
 
 function getBonjourHost() {
+  if (process.platform !== 'darwin') {
+    const h = os.hostname();
+    return h.toLowerCase().endsWith('.local') ? h : `${h}.local`;
+  }
   try {
     const raw = execSync('scutil --get LocalHostName', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
     if (raw) return `${raw}.local`;
@@ -321,11 +325,12 @@ oscSocket.bind(OSC_PORT, '0.0.0.0', () => {
   console.log(`[OSC]     LAN Ready on UDP 0.0.0.0:${OSC_PORT}`);
 });
 
-// --- 4) macOS Bonjour / mDNS LAN Advertisement (dns-sd) ---
+// --- 4) Bonjour / mDNS LAN Advertisement (dns-sd: built into macOS, on Windows via Apple Bonjour) ---
 let bonjourProc = null;
 try {
-  bonjourProc = spawn('dns-sd', ['-R', 'NovaVis L8 Pro 3D Visualizer', '_http._tcp', 'local', String(HTTP_PORT)], {
+  bonjourProc = spawn(process.platform === 'win32' ? 'dns-sd.exe' : 'dns-sd', ['-R', 'NovaVis L8 Pro 3D Visualizer', '_http._tcp', 'local', String(HTTP_PORT)], {
     stdio: 'ignore',
+    windowsHide: true,
   });
   bonjourProc.on('error', () => { stats.bonjourActive = false; });
   stats.bonjourActive = true;

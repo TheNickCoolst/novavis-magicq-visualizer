@@ -1,7 +1,7 @@
 {
   "name": "novavis-magicq-visualizer",
   "version": "1.0.0",
-  "description": "NovaVis Pro — Real-time 3D Volumetric Stage Lighting Visualizer for ChamSys MagicQ (Art-Net & sACN)",
+  "description": "NovaVis Pro \u2014 Real-time 3D Volumetric Stage Lighting Visualizer for ChamSys MagicQ (Art-Net & sACN)",
   "type": "module",
   "main": "server.mjs",
   "scripts": {
@@ -12,5 +12,8 @@
   "dependencies": {
     "three": "^0.187.0",
     "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }
